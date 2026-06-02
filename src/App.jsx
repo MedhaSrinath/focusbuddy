@@ -1,7 +1,45 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import {
+  FaceDetector,
+  FilesetResolver,
+} from "@mediapipe/tasks-vision";
 
 function App() {
   const videoRef = useRef(null);
+  const [faceStatus, setFaceStatus] = useState("No Face");
+  const detectorRef = useRef(null);
+
+  async function setupFaceDetector() {
+    const vision = await FilesetResolver.forVisionTasks(
+      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm"
+    );
+
+    detectorRef.current = await FaceDetector.createFromOptions(
+      vision,
+      {
+        baseOptions: {
+          modelAssetPath:
+            "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/latest/blaze_face_short_range.tflite",
+        },
+        runningMode: "VIDEO",
+      }
+    );
+  }
+
+  function detectFace() {
+    if (!detectorRef.current || !videoRef.current) return;
+
+    const detections = detectorRef.current.detectForVideo(
+      videoRef.current,
+      performance.now()
+    );
+
+    if (detections.detections.length > 0) {
+      setFaceStatus("Face Detected ✅");
+    } else {
+      setFaceStatus("No Face ❌");
+    }
+  }
 
   useEffect(() => {
     async function startCamera() {
@@ -16,7 +54,14 @@ function App() {
       }
     }
 
-    startCamera();
+    async function initialize() {
+      await setupFaceDetector();
+      await startCamera();
+      
+      setInterval(detectFace, 500);
+    }
+
+    initialize();
   }, []);
 
   return (
@@ -30,7 +75,7 @@ function App() {
         width="600"
       />
 
-      <p>Camera Active</p>
+      <p>{faceStatus}</p>
     </div>
   );
 }
